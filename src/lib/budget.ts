@@ -33,7 +33,6 @@ export async function reserveBudget(
     throw new Error(`Hiba a reserve_budget hívásakor: ${error.message}`);
   }
 
-  // A postgres RPC visszaadhat composite típust (vagy tömböt/objektumot)
   const result = Array.isArray(data) ? data[0] : data;
   return {
     ok: Boolean(result?.ok),
@@ -44,13 +43,14 @@ export async function reserveBudget(
 
 /**
  * Lezárja (settle) a job költségét: felszabadítja a foglalást és rögzíti a tényleges költséget.
+ * Visszatérési érték: 'settled', 'already_settled', vagy 'cap_exceeded'.
  */
 export async function settleBudget(
   jobId: string,
   actualUsd: number
-): Promise<void> {
+): Promise<string> {
   const supabase = getSupabaseServiceClient();
-  const { error } = await (supabase.rpc as any)("settle_budget", {
+  const { data, error } = await (supabase.rpc as any)("settle_budget", {
     p_job_id: jobId,
     p_actual_usd: actualUsd,
   });
@@ -58,6 +58,8 @@ export async function settleBudget(
   if (error) {
     throw new Error(`Hiba a settle_budget hívásakor: ${error.message}`);
   }
+
+  return typeof data === "string" ? data : (data ?? "settled");
 }
 
 /**
