@@ -2,7 +2,7 @@
 -- Spec.md 3. és 4. szakasz alapján
 
 -- ---------------------------------------------------------------------------
--- 1. Visszatérési típusok
+-- 1. Visszatérési típusok (biztonságos, idempotens létrehozás)
 -- ---------------------------------------------------------------------------
 DO $$ BEGIN
     CREATE TYPE public.reserve_result AS (
@@ -83,7 +83,6 @@ BEGIN
 
   IF v_existing_reserve > 0 THEN
     -- Már van foglalás ehhez a job-hoz: idempotent siker
-    -- Kiszámoljuk az aktuális remaining-et
     SELECT COALESCE(SUM(amount_usd), 0) INTO v_spent
     FROM public.budget_ledger
     WHERE project_id = p_project_id AND kind = 'actual';
@@ -221,7 +220,6 @@ BEGIN
     VALUES (v_project_id, p_job_id, 'release', v_open_res, 'Release reservation on failure');
   END IF;
 
-  -- generation_jobs reserved_cost_usd nullázása vagy érintetlen hagyása; itt hasznos 0-ra állítani vagy hagyjuk a ledgerre
   UPDATE public.generation_jobs
   SET updated_at = now()
   WHERE id = p_job_id;
@@ -248,7 +246,6 @@ DECLARE
 BEGIN
   -- Jogosultság ellenőrzés (tulajdonos vagy service_role)
   IF auth.uid() IS NOT NULL AND NOT public.is_project_owner(p_project_id) THEN
-    -- Ha nem tulajdonos és nem service_role, kivétel
     RAISE EXCEPTION 'Access denied for project budget summary';
   END IF;
 
@@ -285,17 +282,13 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 6. SECURITY / GRANT BEÁLLÍTások
 -- ---------------------------------------------------------------------------
-
--- Visszavonjuk a jogokat public, anon, authenticated szerepköröktől a pénzügyi függvényekre
 REVOKE EXECUTE ON FUNCTION public.reserve_budget(uuid, uuid, numeric) FROM public, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.settle_budget(uuid, numeric) FROM public, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.release_budget(uuid) FROM public, anon, authenticated;
 
--- Kizárólag a service_role hívhatja ezeket a pénzügyi tranzakciós függvényeket
 GRANT EXECUTE ON FUNCTION public.reserve_budget(uuid, uuid, numeric) TO service_role;
 GRANT EXECUTE ON FUNCTION public.settle_budget(uuid, numeric) TO service_role;
 GRANT EXECUTE ON FUNCTION public.release_budget(uuid) TO service_role;
 
--- project_budget_summary hívható authenticated felhasználók által is (ha tulajdonos), valamint service_role által is
 REVOKE EXECUTE ON FUNCTION public.project_budget_summary(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.project_budget_summary(uuid) TO authenticated, service_role;
