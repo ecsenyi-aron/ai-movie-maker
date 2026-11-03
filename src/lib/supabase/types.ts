@@ -226,6 +226,70 @@ export type Database = {
         >;
         Relationships: [];
       };
+      utterances: {
+        Row: {
+          id: string;
+          project_id: string;
+          character_id: string | null;
+          source_shot_id: string | null;
+          text_hu: string;
+          delivery_style: string;
+          voice_settings: Record<string, unknown>;
+          audio_path: string | null;
+          measured_duration_seconds: number | null;
+          duration_estimated: boolean;
+          version: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          character_id?: string | null;
+          source_shot_id?: string | null;
+          text_hu: string;
+          delivery_style?: string;
+          voice_settings?: Record<string, unknown>;
+          audio_path?: string | null;
+          measured_duration_seconds?: number | null;
+          duration_estimated?: boolean;
+          version?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["utterances"]["Insert"]>;
+        Relationships: [];
+      };
+      timeline_items: {
+        Row: {
+          id: string;
+          project_id: string;
+          track: "video" | "audio" | "subtitle";
+          shot_id: string | null;
+          media_asset_id: string | null;
+          utterance_id: string | null;
+          start_seconds: number;
+          source_in: number | null;
+          source_out: number | null;
+          duration_seconds: number | null;
+          trim_reserve_seconds: number | null;
+          sequence_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          track: "video" | "audio" | "subtitle";
+          shot_id?: string | null;
+          media_asset_id?: string | null;
+          utterance_id?: string | null;
+          start_seconds?: number;
+          source_in?: number | null;
+          source_out?: number | null;
+          duration_seconds?: number | null;
+          trim_reserve_seconds?: number | null;
+          sequence_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["timeline_items"]["Insert"]>;
+        Relationships: [];
+      };
       media_assets: {
         Row: {
           id: string;

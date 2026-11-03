@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { runAgent5QC } from '@/lib/agents/agent5';
+import SpeechTimingSection from '@/components/SpeechTimingSection';
 
 export default function HungarianDashboard() {
   const [premise, setPremise] = useState('');
@@ -506,6 +507,9 @@ export default function HungarianDashboard() {
                 ))}
               </div>
             </div>
+
+            {/* 4c: Beszéd és időzítés + Idővonal (csak olvasás, nem indít gyártást) */}
+            <SpeechTimingSection projectId={result.project.id} />
 
             {/* Export options */}
             <div className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/50">

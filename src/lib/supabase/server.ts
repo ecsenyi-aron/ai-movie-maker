@@ -22,3 +22,33 @@ export function getSupabaseServiceClient(): SupabaseClient<Database> {
     },
   });
 }
+
+/**
+ * Szerveroldali kliens a bejelentkezett felhasználó jogaira (RLS).
+ *
+ * A hívó access tokenjével működik, így az adatbázisban a RLS szabályok
+ * (csak a saját projekt adatai láthatók) érvényesülnek. Titk nem kerül a
+ * böngészőbe, és a service role sem szükséges hozzá.
+ */
+export function getSupabaseUserClient(accessToken: string): SupabaseClient<Database> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error(
+      "Hiányzik a NEXT_PUBLIC_SUPABASE_URL vagy a NEXT_PUBLIC_SUPABASE_ANON_KEY a .env.local fájlból.",
+    );
+  }
+
+  return createClient<Database>(url, anonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
