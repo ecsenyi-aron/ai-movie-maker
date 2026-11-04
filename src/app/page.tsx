@@ -2,15 +2,23 @@
 
 import { useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
-import { runAgent5QC } from '@/lib/agents/agent5';
+import type { Agent1Output, Agent2Output } from '@/lib/gemini';
 import SpeechTimingSection from '@/components/SpeechTimingSection';
+import StockCollectionSection from '@/components/StockCollectionSection';
+
+/** A dashboard által megjelenített eredmény. */
+type DashboardResult = {
+  project: { id: string };
+  agent1: Agent1Output;
+  agent2: Agent2Output;
+};
 
 export default function HungarianDashboard() {
   const [premise, setPremise] = useState('');
   const [genre, setGenre] = useState('Dráma');
   const [loading, setLoading] = useState(false);
   const [stepStatus, setStepStatus] = useState('');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<DashboardResult | null>(null);
   const [error, setError] = useState('');
   const [approvalMode, setApprovalMode] = useState<'stock' | 'premium'>('stock');
   const [budgetCap, setBudgetCap] = useState<number>(0);
@@ -76,67 +84,21 @@ export default function HungarianDashboard() {
                 })
                 .eq('id', shot.id);
 
-              // Run Agent 4: Clip Generation (Stock) via API
-              const resClip = await fetch('/api/agents', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'agent4', visualPromptEn: shot.visual_prompt_en, targetDuration: ttsRes.durationSec })
-              });
-              const dataClip = await resClip.json();
-              if (!resClip.ok) throw new Error(dataClip.error || 'Hiba a Clip ügynök futtatásakor.');
-              const clipRes = dataClip.result;
-
-              if (!clipRes.success) {
-                await supabase
-                  .from('shots')
-                  .update({
-                    status: 'needs_review',
-                    qc_notes: clipRes.error || 'Stock videó lekérése sikertelen.'
-                  })
-                  .eq('id', shot.id);
-                continue;
-              }
-
-              // Run Agent 5: QC & validation
-              const qcRes = await runAgent5QC(clipRes.durationSec, ttsRes.durationSec, clipRes.success, clipRes.attribution);
-
-              // Save media asset
-              if (clipRes.success && clipRes.publicUrl) {
-                await supabase.from('media_assets').insert({
-                  project_id: projectId,
-                  shot_id: shot.id,
-                  type: 'video',
-                  storage_path: clipRes.storagePath || 'stock/fallback.mp4',
-                  public_url: clipRes.publicUrl,
-                  duration_sec: clipRes.durationSec,
-                  provider: clipRes.provider,
-                  attribution: clipRes.attribution
-                });
-              }
-
-              // Update shot final status
-              await supabase
-                .from('shots')
-                .update({
-                  status: qcRes.status === 'qc_ok' ? 'qc_ok' : 'needs_review',
-                  qc_notes: qcRes.qcNotes
-                })
-                .eq('id', shot.id);
+              // Az Agent 4 (stock felvétel) külön lépésben, a "Stock felvételek
+              // gyűjtése" gombbal fut: mindig egyetlen rövid lépést végez.
             }
           }
         }
       }
 
-      // 3. Set project status to preview_ready
-      await supabase
-        .from('projects')
-        .update({ status: 'preview_ready' })
-        .eq('id', projectId);
-
-      alert('Gyártás sikeresen lefutott! Az Animatic / előnézet elkészült.');
-    } catch (err: any) {
+      alert('A projekt jóváhagyva. Most a "Stock felvételek gyűjtése" gombbal folytatható.');
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Hiba történt a gyártás során.');
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Hiba történt a gyártás során.'
+      );
     } finally {
       setApproving(false);
     }
@@ -238,7 +200,7 @@ export default function HungarianDashboard() {
           }
         }
 
-        const { data: insertedScene, error: scErr } = await supabase
+        const { data: insertedScene } = await supabase
           .from('scenes')
           .insert({
             project_id: projectId,
@@ -322,9 +284,13 @@ export default function HungarianDashboard() {
         agent2: agent2Data
       });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Hiba történt a generálás során.');
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Hiba történt a generálás során.'
+      );
     } finally {
       setLoading(false);
     }
@@ -473,7 +439,7 @@ export default function HungarianDashboard() {
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Jelenetek (1. Ügynök)</h3>
               <ul className="mt-2 flex flex-col gap-2">
-                {result.agent1.scenes.map((sc: any) => (
+                {result.agent1.scenes.map((sc) => (
                   <li key={sc.number} className="rounded border border-zinc-100 p-3 text-sm dark:border-zinc-800">
                     <span className="font-semibold">{sc.number}. {sc.title}</span> ({sc.setting}, {sc.time_of_day})
                     <p className="mt-1 text-zinc-600 dark:text-zinc-400">{sc.description}</p>
@@ -495,13 +461,13 @@ export default function HungarianDashboard() {
                 Helyettesítő felvétel: a szereplő és a helyszín nem biztosan egyezik.
               </p>
               <div className="mt-2 flex flex-col gap-2 max-h-80 overflow-y-auto">
-                {result.agent2.shots?.map((sh: any, idx: number) => (
+                {result.agent2.shots?.map((sh, idx: number) => (
                   <div key={idx} className="rounded border border-zinc-100 p-3 text-xs dark:border-zinc-800 flex flex-col gap-1">
                     <div className="font-semibold text-zinc-900 dark:text-zinc-100">
                       Jelenet {sh.scene_number} / Shot {sh.number} [{sh.camera_angle} - {sh.camera_movement}]
                     </div>
                     <div><span className="font-medium">Akció:</span> {sh.action}</div>
-                    {sh.dialogue_hu && <div><span className="font-medium">Párbeszéd:</span> "{sh.dialogue_hu}"</div>}
+                    {sh.dialogue_hu && <div><span className="font-medium">Párbeszéd:</span> {sh.dialogue_hu}</div>}
                     <div className="text-zinc-500"><span className="font-medium">Prompt (EN):</span> {sh.visual_prompt_en}</div>
                   </div>
                 ))}
@@ -510,6 +476,9 @@ export default function HungarianDashboard() {
 
             {/* 4c: Beszéd és időzítés + Idővonal (csak olvasás, nem indít gyártást) */}
             <SpeechTimingSection projectId={result.project.id} />
+
+            {/* Agent 4: Stock / könyvtári felvételek gyűjtése */}
+            <StockCollectionSection projectId={result.project.id} />
 
             {/* Export options */}
             <div className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/50">

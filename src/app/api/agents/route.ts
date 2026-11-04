@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { runAgent1, runAgent2 } from '@/lib/gemini';
 import { processShotAudio } from '@/lib/tts';
-import { runAgent4StockClip } from '@/lib/agents/agent4';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, premise, agent1Result, dialogueHu, targetDuration, visualPromptEn } = body;
+    const { action, premise, agent1Result, dialogueHu, targetDuration } = body;
 
     if (action === 'agent1' || action === 'agent2' || action === 'tts') {
       if (!process.env.GEMINI_API_KEY) {
@@ -38,14 +37,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ result: ttsResult });
     }
 
-    if (action === 'agent4') {
-      const clipResult = await runAgent4StockClip(visualPromptEn || '', targetDuration || 4.0);
-      return NextResponse.json({ result: clipResult });
-    }
-
     return NextResponse.json({ error: 'Ismeretlen akció.' }, { status: 400 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('API Agents Error:', err);
-    return NextResponse.json({ error: err.message || 'Szerverhiba történt az ügynök futtatásakor.' }, { status: 500 });
+    const message =
+      err instanceof Error && err.message
+        ? err.message
+        : 'Szerverhiba történt az ügynök futtatásakor.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

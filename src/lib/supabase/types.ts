@@ -29,7 +29,12 @@ export type JobStatus =
   | "processing"
   | "succeeded"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "uncertain";
+
+export type QcTechnical = "pending" | "ok" | "failed";
+export type QcContent = "pending" | "reviewed" | "rejected";
+export type SourceLabel = "stock_library" | "ai_generated" | "user_upload";
 
 export type MediaType = "audio" | "video" | "image" | "subtitle";
 
@@ -165,6 +170,9 @@ export type Database = {
           actual_cost_usd: number;
           status: ShotStatus;
           qc_notes: string | null;
+          qc_technical: QcTechnical;
+          qc_content: QcContent;
+          scene_accepted: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -184,6 +192,9 @@ export type Database = {
           actual_cost_usd?: number;
           status?: ShotStatus;
           qc_notes?: string | null;
+          qc_technical?: QcTechnical;
+          qc_content?: QcContent;
+          scene_accepted?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["shots"]["Insert"]>;
         Relationships: [];
@@ -302,6 +313,7 @@ export type Database = {
           provider: string | null;
           attribution: string | null;
           lipsync_applied: boolean;
+          source_label: SourceLabel;
           created_at: string;
         };
         Insert: {
@@ -315,8 +327,25 @@ export type Database = {
           provider?: string | null;
           attribution?: string | null;
           lipsync_applied?: boolean;
+          source_label?: SourceLabel;
         };
         Update: Partial<Database["public"]["Tables"]["media_assets"]["Insert"]>;
+        Relationships: [];
+      };
+      stock_search_cache: {
+        Row: {
+          id: string;
+          query_key: string;
+          response: Record<string, unknown>;
+          fetched_at: string;
+        };
+        Insert: {
+          id?: string;
+          query_key: string;
+          response: Record<string, unknown>;
+          fetched_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["stock_search_cache"]["Insert"]>;
         Relationships: [];
       };
     };
@@ -342,6 +371,9 @@ export type Database = {
       generation_step: GenerationStep;
       job_status: JobStatus;
       media_type: MediaType;
+      qc_technical: QcTechnical;
+      qc_content: QcContent;
+      source_label: SourceLabel;
     };
     CompositeTypes: Record<string, never>;
   };
