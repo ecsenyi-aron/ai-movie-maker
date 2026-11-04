@@ -519,9 +519,36 @@ export async function advance(
 
     if (jobInsertErr) {
       if (isUniqueViolation(jobInsertErr)) {
+        // Egyedi kulcsütközés: NEM általános hiba, hanem a már meglévő job.
+        const { data: existingJob, error: existingJobErr } = await adminClient
+          .from('generation_jobs')
+          .select('id, status')
+          .eq('shot_id', shotId)
+          .eq('provider', 'pixabay')
+          .eq('step', 'stock')
+          .eq('attempt', attempt)
+          .maybeSingle();
+
+        if (existingJobErr) {
+          return fail('a meglévő stock feladat betöltése', existingJobErr);
+        }
+
+        if (!existingJob) {
+          return {
+            success: false,
+            message: 'Ez a felvételhez már létezik egy stock feladat (már létezik).',
+          };
+        }
+
+        const existingStatus = String((existingJob as { status?: string }).status ?? '');
+        if (['pending', 'submitted', 'processing'].includes(existingStatus)) {
+          return { success: false, message: 'folyamatban' };
+        }
+
         return {
           success: false,
           message: 'Ez a felvételhez már létezik egy stock feladat (már létezik).',
+          data: { shotId, existingJob: true },
         };
       }
       return fail('a stock feladat létrehozása', jobInsertErr);

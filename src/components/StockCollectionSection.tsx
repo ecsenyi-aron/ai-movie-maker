@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  prepareShotsForStock,
+  type PrepareAction,
+  type PrepareStepResult,
+} from '@/lib/agents/agent4-prepare';
 
 const AGENT4_LABEL = 'Stock / könyvtári felvétel';
 const PAUSE_MS = 1500;
@@ -131,6 +136,35 @@ export default function StockCollectionSection({ projectId }: { projectId: strin
         setErrorText('Nincs aktív bejelentkezés. Kérlek, jelentkezz be újra.');
         return;
       }
+
+      // Előkészítés: az Agent 3 lépései (beszédek, majd időtartamok lezárása).
+      // Enélkül a felvételek 'planned' állapotban maradnának, és az advance()
+      // nem találna 'audio_ready' felvételt.
+      setStatusText('A felvételek előkészítése (beszédek és időtartamok)...');
+      const prepared = await prepareShotsForStock(async (action: PrepareAction) => {
+        const res = await fetch('/api/agent3/checkpoint', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action, projectId }),
+        });
+        const data = await res.json().catch(() => null);
+        const step: PrepareStepResult = {
+          ok: res.ok && data?.success === true,
+          message: data?.message ?? data?.error ?? 'Ismeretlen hiba.',
+        };
+        return step;
+      });
+
+      if (!prepared.success) {
+        setErrorText(prepared.message);
+        setStatusText('');
+        return;
+      }
+
+      await load();
 
       // Egy hívás egyszerre, és csak akkor indul a következő, ha az kész.
       for (;;) {

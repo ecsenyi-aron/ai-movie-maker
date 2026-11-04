@@ -4,7 +4,7 @@ import {
   getCheckpointData,
   updateDialogueAndRecompute,
 } from '@/lib/agents/agent3-checkpoint';
-import { buildUtterances } from '@/lib/agents/agent3';
+import { buildUtterances, lockDurations } from '@/lib/agents/agent3';
 
 /**
  * Adatbázis-jogosultság hiba (Postgres 42501: permission denied).
@@ -129,7 +129,12 @@ export async function GET(request: Request) {
   }
 }
 
-/** Műveletek: 'update_dialogue' (szerkesztés + csak az adott beszéd újraszámolása), 'build_utterances'. */
+/**
+ * Műveletek:
+ *   'update_dialogue'    — szerkesztés + csak az adott beszéd újraszámolása,
+ *   'build_utterances'   — a beszédek és az idővonal elemeinek felépítése,
+ *   'lock_durations'     — az időtartamok lezárása (a felvételek 'audio_ready' állapotba kerülnek).
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -167,6 +172,15 @@ export async function POST(request: Request) {
 
     if (action === 'build_utterances') {
       const result = await buildUtterances(auth.supabase, projectId);
+      if (!result.success) {
+        return NextResponse.json({ error: result.message }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, message: result.message, data: result.data });
+    }
+
+    if (action === 'lock_durations') {
+      // Az időtartamok lezárása nem módosítja a projekt állapotát.
+      const result = await lockDurations(auth.supabase, projectId);
       if (!result.success) {
         return NextResponse.json({ error: result.message }, { status: 400 });
       }

@@ -39,6 +39,11 @@ class FakeDb {
     stock_search_cache: [],
   };
   failOn: { table: string; op: string } | null = null;
+  /**
+   * Szimulált egyedi kulcsütközés (23505) a generation_jobs beszúrásakor:
+   * a sor ilyenkor egy "párhuzamos" jobot jelent, amely már létezik.
+   */
+  insertConflict: { table: string; row: Row } | null = null;
   userId = 'user-1';
   uploads: string[] = [];
   n = 0;
@@ -94,6 +99,17 @@ function makeBuilder(db: FakeDb, table: string): FakeBuilder {
     const match = () => rows.filter((r) => filters.every((f) => f(r)));
 
     if (op === 'insert') {
+      if (db.insertConflict && db.insertConflict.table === table) {
+        // A párhuzamos beszúrás "nyert": a sor már létezik az adatbázisban.
+        rows.push({ id: `id-${++db.n}`, ...db.insertConflict.row });
+        return {
+          data: null,
+          error: {
+            message: 'duplicate key value violates unique constraint "generation_jobs_unique"',
+            code: '23505',
+          },
+        };
+      }
       const list = Array.isArray(payload) ? payload : [payload];
       const out: Row[] = [];
       for (const p of list) {
@@ -646,6 +662,57 @@ test('advance: ugyanaz a Pixabay videó nem töltődik le kétszer egy projektbe
     const video = db.tables.timeline_items.filter((t) => t.track === 'video');
     assert.equal(video.length, 1);
     assert.equal(video[0].media_asset_id, 'asset-existing');
+  } finally {
+    net.restore();
+  }
+});
+
+test('advance: egyedi kulcsütközés a futó job meglévőnek számít, nem általános hiba', async () => {
+  const db = setupDb();
+  db.insertConflict = {
+    table: 'generation_jobs',
+    row: {
+      id: 'job-parallel',
+      project_id: PROJECT_ID,
+      shot_id: 'shot-1',
+      provider: 'pixabay',
+      step: 'stock',
+      attempt: 1,
+      status: 'processing',
+    },
+  };
+  const net = installFetch({ hits: [landscapeHit(105, 12)] });
+  try {
+    const r = await withKey(() => advance(asClient(db), asClient(db), PROJECT_ID));
+    assert.equal(r.success, false);
+    assert.equal(r.message, 'folyamatban');
+    assert.equal(db.tables.media_assets.length, 0);
+    assert.equal(net.calls.length, 0, 'ütközésnél nincs hálózati kérés');
+  } finally {
+    net.restore();
+  }
+});
+
+test('advance: egyedi kulcsütközésnél már lezárt job esetén magyar "már létezik" üzenet', async () => {
+  const db = setupDb();
+  db.insertConflict = {
+    table: 'generation_jobs',
+    row: {
+      id: 'job-done',
+      project_id: PROJECT_ID,
+      shot_id: 'shot-1',
+      provider: 'pixabay',
+      step: 'stock',
+      attempt: 1,
+      status: 'failed',
+    },
+  };
+  const net = installFetch({ hits: [landscapeHit(106, 12)] });
+  try {
+    const r = await withKey(() => advance(asClient(db), asClient(db), PROJECT_ID));
+    assert.equal(r.success, false);
+    assert.match(r.message, /már létezik/);
+    assert.equal(db.tables.media_assets.length, 0);
   } finally {
     net.restore();
   }
