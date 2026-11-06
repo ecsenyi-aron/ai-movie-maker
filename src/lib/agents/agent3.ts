@@ -92,7 +92,7 @@ async function loadOrderedShots(
 
   const { data: shots, error: shotsErr } = await supabase
     .from('shots')
-    .select('id, scene_id, number, dialogue_hu, target_duration_sec, status')
+    .select('id, scene_id, number, dialogue_hu, target_duration_sec, status, speaker_character_id')
     .in('scene_id', scenes.map((s: any) => s.id));
   if (shotsErr) return { ok: false, result: fail('a felvételek betöltése', shotsErr) };
   if (!shots || shots.length === 0) {
@@ -174,6 +174,7 @@ export async function buildUtterances(supabase: SupabaseClient, projectId: strin
             .insert({
               project_id: projectId,
               source_shot_id: shot.id,
+              character_id: shot.speaker_character_id ?? null,
               text_hu: dialogue,
               delivery_style: '',
               voice_settings: UNVERIFIED_VOICE_SETTINGS,
@@ -195,6 +196,14 @@ export async function buildUtterances(supabase: SupabaseClient, projectId: strin
           }
           utter = current.map.get(shot.id);
           if (!utter) return fail('a beszéd megtalálása létrehozás után');
+        } else if (shot.speaker_character_id && !utter.character_id) {
+          // A beszélő kapcsolatot utólag is pótoljuk, ha a felvételhez került.
+          const { error } = await supabase
+            .from('utterances')
+            .update({ character_id: shot.speaker_character_id })
+            .eq('id', utter.id);
+          if (error) return fail('a beszélő kapcsolat frissítése', error);
+          utter = { ...utter, character_id: shot.speaker_character_id };
         }
 
         const { data: subItem, error: sSelErr } = await supabase

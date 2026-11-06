@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServiceClient, getSupabaseUserClient } from '@/lib/supabase/server';
 import { advance } from '@/lib/agents/agent4';
+import { advancePremium } from '@/lib/agents/agent4-premium';
 
 /**
  * POST /api/advance
@@ -16,6 +17,17 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
     const projectId = body?.projectId as string | undefined;
+    // Manuális újrapróbálás (prémium) és Stock helyettesítő egy adott felvételre.
+    const manualRetry = body?.manualRetry === true;
+    const stockFallbackShotId =
+      typeof body?.stockFallbackShotId === 'string' && body.stockFallbackShotId.length > 0
+        ? body.stockFallbackShotId
+        : null;
+    // A prémium újrapróbálás egy konkrét felvételre is szűkíthető.
+    const retryShotId =
+      typeof body?.retryShotId === 'string' && body.retryShotId.length > 0
+        ? body.retryShotId
+        : null;
 
     if (!projectId || typeof projectId !== 'string') {
       return NextResponse.json(
@@ -45,7 +57,29 @@ export async function POST(request: Request) {
 
     const adminClient = getSupabaseServiceClient();
 
-    const result = await advance(userClient, adminClient, projectId);
+    // A projekt módja dönti el, melyik Agent 4 munkafolyamat fut.
+    const { data: project, error: projectError } = await adminClient
+      .from('projects')
+      .select('mode')
+      .eq('id', projectId)
+      .maybeSingle();
+
+    if (projectError) {
+      return NextResponse.json(
+        { error: 'A projekt betöltése nem sikerült.' },
+        { status: 500 }
+      );
+    }
+
+    const result =
+      project?.mode === 'premium' && !stockFallbackShotId
+        ? await advancePremium(userClient, adminClient, projectId, {
+            manualRetry,
+            forceShotId: retryShotId ?? undefined,
+          })
+        : await advance(userClient, adminClient, projectId, {
+            forceShotId: stockFallbackShotId ?? undefined,
+          });
 
     // A "folyamatban" állapot nem hiba, csak tájékoztató.
     const status = result.success ? 200 : result.message === 'folyamatban' ? 409 : 400;
@@ -55,7 +89,7 @@ export async function POST(request: Request) {
     const message =
       err instanceof Error && err.message
         ? err.message
-        : 'Szerverhiba történt a stock felvételek gyűjtésekor.';
+        : 'Szerverhiba történt a felvételek gyűjtésekor.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

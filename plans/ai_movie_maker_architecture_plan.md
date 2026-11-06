@@ -70,7 +70,7 @@ graph TD
 4. **Approval Checkpoint Testing:**
    - Verify that no paid calls are made before clicking **"Jóváhagyás és gyártás indítása"**.
 5. **Clip Generation & Storage Testing (Agent 4):**
-   - Test Pixabay stock search and download in Free mode. Verify storage persistence and attribution labels (**"Stock videó (nem AI-generált)"**).
+   - Test Pixabay stock search and download in Free mode. Verify storage persistence and attribution labels (**"Stock videó (AI-generálás nélkül)"**).
 6. **Preview & QC Testing (Agent 5):**
    - Test sequential browser playback with audio and subtitles. Verify ZIP export fallback when assembly service is unconfigured.
 

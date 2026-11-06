@@ -28,8 +28,12 @@ export async function POST(request: Request) {
       if (!premise || !agent1Result) {
         return NextResponse.json({ error: 'Hiányzó paraméterek a 2. ügynökhöz.' }, { status: 400 });
       }
-      const result = await runAgent2(premise, agent1Result);
-      return NextResponse.json({ result });
+      const validation = await runAgent2(premise, agent1Result);
+      return NextResponse.json({
+        result: validation.output,
+        notes: validation.notes,
+        remainingViolations: validation.remainingViolations,
+      });
     }
 
     if (action === 'tts') {

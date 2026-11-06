@@ -34,7 +34,14 @@ export type JobStatus =
 
 export type QcTechnical = "pending" | "ok" | "failed";
 export type QcContent = "pending" | "reviewed" | "rejected";
-export type SourceLabel = "stock_library" | "ai_generated" | "user_upload";
+export type SourceLabel = "stock_library" | "ai_generated" | "user_upload" | "mock";
+
+export type DialogueMode = "on_camera" | "voice_over" | "none";
+
+/** A Prémium referencia feladat tulajdonosának típusa (karakter vagy helyszín). */
+export type ReferenceOwnerType = "character" | "location";
+
+export type ReferenceGateStatus = "unchecked" | "passed" | "failed" | "unavailable";
 
 export type MediaType = "audio" | "video" | "image" | "subtitle";
 
@@ -162,6 +169,9 @@ export type Database = {
           camera_movement: string | null;
           action: string;
           dialogue_hu: string | null;
+          dialogue_mode: DialogueMode | null;
+          speaker_character_id: string | null;
+          featured_character_ids: string[];
           visual_prompt_en: string;
           target_duration_sec: number | null;
           actual_duration_sec: number | null;
@@ -184,6 +194,9 @@ export type Database = {
           camera_movement?: string | null;
           action?: string;
           dialogue_hu?: string | null;
+          dialogue_mode?: DialogueMode | null;
+          speaker_character_id?: string | null;
+          featured_character_ids?: string[];
           visual_prompt_en?: string;
           target_duration_sec?: number | null;
           actual_duration_sec?: number | null;
@@ -214,6 +227,8 @@ export type Database = {
           reserved_cost_usd: number;
           actual_cost_usd: number;
           error: string | null;
+          reference_owner_type: ReferenceOwnerType | null;
+          reference_owner_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -231,6 +246,8 @@ export type Database = {
           reserved_cost_usd?: number;
           actual_cost_usd?: number;
           error?: string | null;
+          reference_owner_type?: ReferenceOwnerType | null;
+          reference_owner_id?: string | null;
         };
         Update: Partial<
           Database["public"]["Tables"]["generation_jobs"]["Insert"]
@@ -346,6 +363,37 @@ export type Database = {
           fetched_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["stock_search_cache"]["Insert"]>;
+        Relationships: [];
+      };
+      reference_versions: {
+        Row: {
+          id: string;
+          project_id: string;
+          owner_type: "character" | "location";
+          owner_id: string;
+          version: number;
+          storage_path: string | null;
+          prompt: string | null;
+          status: "proposed" | "approved";
+          gate_status: ReferenceGateStatus;
+          gate_issues: string[];
+          gate_checked_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          owner_type: "character" | "location";
+          owner_id: string;
+          version?: number;
+          storage_path?: string | null;
+          prompt?: string | null;
+          status?: "proposed" | "approved";
+          gate_status?: ReferenceGateStatus;
+          gate_issues?: string[];
+          gate_checked_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["reference_versions"]["Insert"]>;
         Relationships: [];
       };
     };

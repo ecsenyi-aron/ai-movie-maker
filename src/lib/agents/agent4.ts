@@ -19,7 +19,7 @@ import {
 /** A felhasználónak megjelenő címke. */
 export const AGENT4_LABEL = 'Stock / könyvtári felvétel';
 
-const MEDIA_BUCKET = 'media';
+export const MEDIA_BUCKET = 'media';
 const PIXABAY_SEARCH_URL = 'https://pixabay.com/api/videos/';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TIMEOUT_MS = 20_000;
@@ -38,7 +38,7 @@ export interface Agent4Result {
 }
 
 /** A `shots` tábla sorainak a modulban használt mezői. */
-interface ShotRow {
+export interface ShotRow {
   id: string;
   scene_id: string;
   number: number;
@@ -69,7 +69,7 @@ interface AssetRow {
 }
 
 /** Felvétel film sorrendben, a globális sorszámmal. */
-type OrderedShot = ShotRow & { position: number };
+export type OrderedShot = ShotRow & { position: number };
 
 function fail(step: string, error?: unknown): Agent4Result {
   const detail =
@@ -98,7 +98,7 @@ function broaderKeywords(keywords: string): string {
   return parts.slice(0, Math.max(1, parts.length - 2)).join(' ');
 }
 
-interface SearchOutcome {
+export interface SearchOutcome {
   ok: boolean;
   hits: PixabayHit[];
   /** 'cache' | 'network' */
@@ -114,7 +114,7 @@ interface SearchOutcome {
  * Keresés a Pixabay-on, 24 órás adatbázis-gyorsítótárral.
  * Az API-kulcs és a kulcsot tartalmazó URL soha nem kerül naplóba.
  */
-async function searchPixabay(
+export async function searchPixabay(
   adminClient: SupabaseClient,
   apiKey: string,
   keywords: string
@@ -221,7 +221,7 @@ async function searchPixabay(
 }
 
 /** Letölti a klipet. Időtúllépés = bizonytalan kimenet. */
-async function downloadClip(
+export async function downloadClip(
   url: string
 ): Promise<
   | { ok: true; bytes: Uint8Array; contentType: string; contentLength: number | null }
@@ -283,7 +283,8 @@ async function storageFolderHasFile(
 export async function advance(
   userClient: SupabaseClient,
   adminClient: SupabaseClient,
-  projectId: string
+  projectId: string,
+  options: { forceShotId?: string } = {}
 ): Promise<Agent4Result> {
   try {
     // ------------------------------------------------------------------
@@ -327,7 +328,10 @@ export async function advance(
         message: 'A projekt még nincs jóváhagyva, ezért a stock felvételek gyűjtése nem indítható.',
       };
     }
-    if (project.mode !== 'stock') {
+    // A Prémium projektben a Stock mód csak manuális "Stock helyettesítő"
+    // lépésként indítható egy adott felvételre (forceShotId).
+    const forcedShotId = options.forceShotId ?? null;
+    if (project.mode !== 'stock' && !forcedShotId) {
       return {
         success: false,
         message: 'Ez a projekt nem Stock módban van, ezért a könyvtári felvételek gyűjtése nem indítható.',
@@ -460,18 +464,25 @@ export async function advance(
       jobs.filter((j) => j.status === 'succeeded' && j.shot_id).map((j) => j.shot_id)
     );
 
-    const nextShot = orderedShots.find((shot: OrderedShot) => {
-      if (succeededShotIds.has(shot.id)) return false;
-      if (shot.status === 'audio_ready') return true;
-      // Újrapróbálás: csak sikertelen stock feladat után, legfeljebb egyszer.
-      if (shot.status === 'needs_review') {
-        const failedAttempts = jobs.filter(
-          (j) => j.shot_id === shot.id && j.status === 'failed'
-        ).length;
-        return failedAttempts > 0 && failedAttempts < 2;
-      }
-      return false;
-    });
+    const nextShot = forcedShotId
+      ? orderedShots.find((shot: OrderedShot) => {
+          if (shot.id !== forcedShotId) return false;
+          if (succeededShotIds.has(shot.id)) return false;
+          // A kényszerített helyettesítő csak egy sikertelen felvételre futhat.
+          return shot.status === 'needs_review' || shot.status === 'audio_ready';
+        })
+      : orderedShots.find((shot: OrderedShot) => {
+          if (succeededShotIds.has(shot.id)) return false;
+          if (shot.status === 'audio_ready') return true;
+          // Újrapróbálás: csak sikertelen stock feladat után, legfeljebb egyszer.
+          if (shot.status === 'needs_review') {
+            const failedAttempts = jobs.filter(
+              (j) => j.shot_id === shot.id && j.status === 'failed'
+            ).length;
+            return failedAttempts > 0 && failedAttempts < 2;
+          }
+          return false;
+        });
 
     if (!nextShot) {
       return { success: true, message: 'nincs több teendő' };
@@ -824,14 +835,21 @@ export async function advance(
   }
 }
 
+/** A linkeléshez szükséges minimális felvételadat. */
+export interface LinkableShot {
+  id: string;
+  actual_duration_sec: number | null;
+  target_duration_sec: number | null;
+}
+
 /** Linkeli a videó idővonal-elemet a médiafájlhoz (vagy létrehozza). */
-async function linkTimelineItem(
+export async function linkTimelineItem(
   adminClient: SupabaseClient,
   projectId: string,
   shotId: string,
   mediaAssetId: string,
-  orderedShots: OrderedShot[],
-  shot: OrderedShot
+  orderedShots: LinkableShot[],
+  shot: LinkableShot
 ): Promise<{ ok: true } | { ok: false; result: Agent4Result }> {
   const position = orderedShots.findIndex((s) => s.id === shotId) + 1;
 
@@ -856,9 +874,19 @@ async function linkTimelineItem(
   }
 
   if (existing) {
+    // Újrafeldolgozáskor a kezdőidőt és a hosszt is újra kell számolni:
+    // ha egy korábbi felvétel hossza megváltozott, az összes utána következő
+    // elem elcsúszik az idővonalon.
     const { error } = await adminClient
       .from('timeline_items')
-      .update({ media_asset_id: mediaAssetId })
+      .update({
+        media_asset_id: mediaAssetId,
+        start_seconds: startSeconds,
+        source_in: 0,
+        source_out: duration,
+        duration_seconds: duration,
+        sequence_order: position,
+      })
       .eq('id', (existing as { id: string }).id);
     if (error) {
       return { ok: false, result: fail('a videó idővonal-elem frissítése', error) };

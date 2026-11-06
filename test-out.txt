@@ -1,0 +1,35 @@
+✔ prémium: a referencia kép elkészül és a privát media bucketbe kerül (4.934ms)
+✔ prémium: a referencia kép pontosan egyszer készül el (a meglévő újrahasznosul) (1.9448ms)
+✔ prémium: a videó nem indulhat el, ha a referencia még hiányzik (0.5858ms)
+✔ prémium: a videó film sorrendben készül (először az 1. felvétel) (1.1149ms)
+✔ prémium: a MOCK eredmény látható MOCK / TESZT jelölést kap (0.8167ms)
+✔ prémium: a videó csak sikeres feltöltés után lesz clip_ready (1.1983ms)
+✔ idővonal: a felvételek egymás után fűződnek össze (start_seconds halmozódik) (4.1838ms)
+✔ idővonal: újrafeldolgozáskor a kezdőidő és a hossz is frissül (1.7876ms)
+✔ prémium: több főszereplőnél az `elements` tömbbe kerülnek a további referenciák (1.042ms)
+✔ prémium: egyetlen főszereplőnél az `elements` tömb üres marad (0.7521ms)
+✔ prémium: a helyszín is az `elements` tömbbe kerül, ha van főszereplő (0.8405ms)
+✔ prémium: a hibás videó nem lesz kész, és Stock helyettesítő ajánlható (0.338ms)
+✔ prémium: bizonytalan kimenetnél nem indul új fizetős kérés (0.2779ms)
+✔ prémium: a bizonytalan feladat a következő advance()-ben csak lekérdezésre kerül (0.4416ms)
+✔ prémium: azonosító nélküli bizonytalan feladat lezáródik, és nem indul új fizetős kérés (0.2858ms)
+✔ prémium: a bizonytalan videó feladat sem indít új fizetős kérést (0.2156ms)
+✔ prémium: a költségvetési foglalás sikertelensége megállítja a fizetős lépést (0.1602ms)
+✔ prémium: a MOCK provider költsége 0, így nem kell foglalás (0.3944ms)
+✔ prémium: sikertelen videó után nincs automatikus újrapróbálás (0.2643ms)
+✔ prémium: manuális újrapróbálás egy új feladatot indít (0.7722ms)
+✔ prémium: jóváhagyás nélkül nem indul semmi (0.1002ms)
+✔ prémium: nem prémium módú projekt elutasítva (0.0836ms)
+✔ prémium: idegen projekt elutasítva (0.0692ms)
+✔ MOCK fixture: a videó fixture átmegy a letöltés-ellenőrzésen (0.4632ms)
+✔ MOCK fixture: a referencia kép fixture valódi PNG (0.2111ms)
+✔ MOCK provider: a siker, hiba és bizonytalan kimenet is kezelve van (0.0893ms)
+✔ MOCK provider: a szimulált költség elkülönül a valós költségtől (0.0534ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2070.6626

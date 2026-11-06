@@ -239,14 +239,25 @@ export default function HungarianDashboard() {
         });
 
       // Save characters
+      // A stabil azonosító -> adatbázis uuid térkép: a felvételek beszélő- és
+      // szereplőhivatkozásai (speaker_character_id, featured_character_ids)
+      // csak így tudnak valódi karakter sorra mutatni.
+      const characterIdByStableId = new Map<string, string>();
       if (agent2Data.characters) {
         for (const ch of agent2Data.characters) {
-          await supabase.from('characters').insert({
-            project_id: projectId,
-            stable_id: ch.stable_id,
-            name: ch.name,
-            canonical_description: ch.canonical_description
-          });
+          const { data: insertedCharacter } = await supabase
+            .from('characters')
+            .insert({
+              project_id: projectId,
+              stable_id: ch.stable_id,
+              name: ch.name,
+              canonical_description: ch.canonical_description
+            })
+            .select('id')
+            .single();
+          if (insertedCharacter?.id) {
+            characterIdByStableId.set(ch.stable_id, insertedCharacter.id);
+          }
         }
       }
 
@@ -256,6 +267,12 @@ export default function HungarianDashboard() {
         for (const sh of agent2Data.shots) {
           const sceneId = sceneMap.get(sh.scene_number);
           if (sceneId) {
+            const speakerId = sh.speaker_character_id
+              ? characterIdByStableId.get(sh.speaker_character_id) ?? null
+              : null;
+            const featuredIds = ((sh.featured_character_ids ?? []) as string[])
+              .map((stableId: string) => characterIdByStableId.get(stableId))
+              .filter((id: string | undefined): id is string => Boolean(id));
             await supabase.from('shots').insert({
               scene_id: sceneId,
               number: sh.number,
@@ -265,6 +282,9 @@ export default function HungarianDashboard() {
               dialogue_hu: sh.dialogue_hu || '',
               visual_prompt_en: sh.visual_prompt_en,
               target_duration_sec: sh.target_duration_sec || 4.0,
+              dialogue_mode: sh.dialogue_mode || 'none',
+              speaker_character_id: speakerId,
+              featured_character_ids: featuredIds,
               status: 'planned'
             });
           }

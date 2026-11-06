@@ -8,7 +8,7 @@ The app is an AI-assisted studio where 5 specialized agents run as steps of ONE 
 - Inspect the existing Lovable project first; reuse working UI, schema and features. Do not rebuild unnecessarily.
 - Keep the MVP simple and browser-native. Use Lovable Cloud/Supabase for database, storage and short Edge Functions. No external Docker workers.
 - Only Agents 1–2 use Gemini LLM calls. Agents 3–5 are ordinary code, not separate AI agents.
-- Default mode: Pixabay stock footage, only if its current terms and free limits are verified. Always label it **“Stock videó (nem AI-generált)”**. Premium fal.ai video is optional and requires explicit approval and a server-side budget check.
+- Default mode: Pixabay stock footage, only if its current terms and free limits are verified. Always label it **“Stock videó (AI-generálás nélkül)”**. Premium fal.ai video is optional and requires explicit approval and a server-side budget check.
 - Use Gemini TTS for Hungarian dialogue only after verifying access, endpoint, limits and price. If unavailable or over quota, show dialogue as subtitles with estimated duration. Do not use browser Web Speech API.
 - Never invent endpoints, capabilities, durations, free credits, terms or prices. Verify every integration before enabling it. Clearly label unconfigured features; never fake successful generation.
 - Calculate costs in server code, never with an LLM. Keep API keys in server-side secrets only.
@@ -40,7 +40,7 @@ Shot statuses: `planned → audio_ready → clip_ready → qc_ok` or `needs_revi
 - Prevent duplicate paid submissions with unique constraints, idempotency and disabled buttons. Save `provider_job_id` immediately; after uncertain timeouts, check/reconcile the existing job before resubmitting.
 - Before every paid step (reference, video, lip-sync, retry), check server-side that actual spend + reserved pending costs + next estimated cost stays within the approved cap. Track estimated, reserved and actual costs separately without double-counting. Unknown price disables Premium. If over cap, stop and request approval; browser-only checks are insufficient.
 - Allow at most one retry per shot, only if safe and within budget; manual retries use the same server check.
-- On API failure, log and mark failed; show a Hungarian error. Never switch providers silently. Premium video may fall back for that shot only to **“Stock helyettesítő (nem AI-generált)”**, marked `needs_review`.
+- On API failure, log and mark failed; show a Hungarian error. Never switch providers silently. Premium video may fall back for that shot only to **“Stock helyettesítő (AI-generálás nélkül)”**, marked `needs_review`.
 - Mark completed only after downloading to Lovable Storage and validating that the file is non-empty, playable and has checked metadata/duration.
 - Agents 1–2 use Gemini structured JSON (`responseMimeType: application/json` + schema), validated server-side. Allow one repair for malformed output; invalid output must never trigger paid calls.
 - For 429/quota errors, back off and retry once, then explain clearly; never switch providers silently. If Gemini blocks the idea, explain in Hungarian and let the user edit it; do not bypass safety.

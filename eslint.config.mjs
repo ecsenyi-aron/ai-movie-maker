@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Kutatási segédletek (a fal.ai dokumentáció offline másolatai és
+    // a hozzájuk tartozó parancssori scriptek) — nem alkalmazáskód.
+    "research/**",
   ]),
 ]);
 
